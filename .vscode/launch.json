@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Run Backtest",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/ml/alpha/run_backtest.py",
+            "args": [
+                "--train", "2018-01-01,2019-06-01",
+                "--val", "2019-06-01,2019-12-31",
+                "--test", "2020-01-01,2020-12-31",
+                "--data", "T2_engineered_features.csv",
+                "--output-dir", "results",
+                "--initial-capital", "1000000",
+                "--target-freq", "1H"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Feature Engineering",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/ml/feature_engineering/T2_feature_engineering.py",
+            "args": [
+                "--train-period", "2018-01-01,2019-06-01",
+                "--val-period", "2019-06-01,2019-12-31",
+                "--test-period", "2020-01-01,2020-12-31",
+                "--freq", "1min",
+                "--output-dir", "data",
+                "--export-individual"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

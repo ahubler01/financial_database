@@ -1,0 +1,48 @@
+Performance Report
+=================
+
+Trading Periods:
+Training: 2018-01-01 to 2019-06-01
+Validation: 2019-06-01 to 2019-12-31
+Testing: 2020-01-01 to 2020-12-31
+
+Market Context:
+AAPL Annualized Volatility (Test Period): 39354.69%
+The test period was characterized by bearish market conditions, which may have
+impacted the strategy's performance. Consider adjusting the following parameters:
+1. Probability thresholds for long/short positions
+2. Position sizing methodology
+3. Risk management rules
+
+Model Performance (Validation Set):
+Mean Squared Error (MSE): 0.074298
+Root Mean Squared Error (RMSE): 0.272577
+
+Key Performance Indicators:
+1. Number of Trades: 4118
+2. Annualized Return: -982.20%
+3. Annualized Volatility: 0.05%
+4. Sharpe Ratio: -19969.51
+5. Maximum Drawdown: -33.73%
+6. Hit Rate: 0.00%
+7. Average PnL per Trade: $-99.94
+8. Annual Turnover: 0.00
+
+Strategy Overview:
+The strategy uses a LightGBM classifier to predict the direction of next-minute returns.
+Trades are executed when the model's probability exceeds predefined thresholds:
+- Long positions when p̂(y=+1) > 0.55
+- Short positions when p̂(y=+1) < 0.45
+- Flat otherwise
+
+Position sizing is volatility-scaled to target 1% annual volatility.
+The strategy includes 0.5bp slippage per round-trip trade.
+
+Initial Capital: $1,000,000.00
+Final Portfolio Value: $662,610.94
+Total Return: -33.74%
+
+Risk Management:
+- Position sizing dynamically adjusts based on realized volatility
+- Maximum position size is capped by the target annual volatility
+- Trades are exited at t+1 or when signal flips, whichever comes first
