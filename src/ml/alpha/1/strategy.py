@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 # Configuration constants
 CONFIG = {
     'EPSILON': 0.0005,  # 5bp threshold for label definition (increased from 1bp)
-    'LONG_THRESHOLD': 0.72,  # Probability threshold for long positions
-    'SHORT_THRESHOLD': 0.28,  # Probability threshold for short positions
-    'TARGET_ANNUAL_VOL': 0.01,  # 1% target annual volatility
+    'LONG_THRESHOLD': 0.62,  # Probability threshold for long positions
+    'SHORT_THRESHOLD': 0.38,  # Probability threshold for short positions
+    'TARGET_ANNUAL_VOL': 0.45,  # 1% target annual volatility
     'SLIPPAGE': 0.0001,   # assume 1bp per round‐trip
-    'EXIT_HORIZON': 60*2,  # minutes
-    'MAX_POSITION': 15.0,  # maximum position size
-    'TARGET_FREQUENCY': '1H',  # frequency for target variable ('1min', '5min', '1H', '1D')
+    'EXIT_HORIZON': 60*10,  # minutes
+    'MAX_POSITION': 20.0,  # maximum position size
+    'POSITION_MULTIPLIER': 15.5,  # multiplier to increase position size
+    'TARGET_FREQUENCY': '1h',  # frequency for target variable ('1min', '5min', '1H', '1D')
     'MODEL_PARAMS': {
         'objective': 'binary',
         'metric': 'binary_logloss',
@@ -47,7 +48,7 @@ CONFIG = {
 
 class DataLoader:
     def __init__(self, data_path: str):
-        self.project_root = Path(__file__).parent.parent.parent.parent
+        self.project_root = Path(__file__).parent.parent.parent.parent.parent
         self.data_dir = os.path.join(self.project_root, 'data')
         
         # Load pre-split dataframes
@@ -137,16 +138,12 @@ class DataLoader:
             # Apply 3-period smoothing to returns
             df['smoothed_return'] = df['agg_log_return'].rolling(window=3).mean()
             
-            # Create label: sign of next period smoothed return with epsilon threshold
-            df['label'] = np.sign(df['smoothed_return'].shift(-1))
-            df.loc[abs(df['smoothed_return'].shift(-1)) < CONFIG['EPSILON'], 'label'] = 0
+            # Create binary label: 1 if next period return is positive and above epsilon, 0 otherwise
+            df['label'] = (df['smoothed_return'].shift(-1) > CONFIG['EPSILON']).astype(int)
         else:
             # Original 1-minute frequency logic
-            df['label'] = np.sign(df['log_return'].shift(-1))
-            df.loc[abs(df['log_return'].shift(-1)) < CONFIG['EPSILON'], 'label'] = 0
+            df['label'] = (df['log_return'].shift(-1) > CONFIG['EPSILON']).astype(int)
         
-        print(df['agg_log_return'].describe())
-        print(df[['agg_log_return', 'label']].iloc[1000:1010])
         # Separate features and target
         feature_cols = [col for col in df.columns if col not in ['label', 'log_return', 'agg_log_return', 'smoothed_return']]
         X = df[feature_cols]
@@ -188,7 +185,26 @@ class TradingStrategy:
     def calculate_position_size(self, df: pd.DataFrame) -> pd.Series:
         # Scale 3-block realized vol to annual
         annualized_vol = df['realized_vol_3block'] * np.sqrt(252 * 6.5 * 60)  # 6.5 hours * 60 minutes
-        position_size = np.minimum(CONFIG['TARGET_ANNUAL_VOL']/annualized_vol, CONFIG['MAX_POSITION'])
+        
+        # Calculate base position size and apply multiplier
+        base_position_size = CONFIG['TARGET_ANNUAL_VOL']/annualized_vol
+        position_size = base_position_size * CONFIG['POSITION_MULTIPLIER']
+        
+        # Apply maximum position limit
+        position_size = np.minimum(position_size, CONFIG['MAX_POSITION'])
+        
+        # Add conviction scaling - increase position size when vol is lower
+        vol_percentile = df['realized_vol_3block'].rolling(window=30).apply(
+            lambda x: pd.Series(x).rank(pct=True).iloc[-1] if len(x) > 0 else 0.5
+        )
+        conviction_multiplier = 1.0 + (1.0 - vol_percentile) * 0.5  # Up to 50% more when vol is low
+        
+        # Apply conviction multiplier
+        position_size = position_size * conviction_multiplier
+        
+        # Ensure max position constraint is still respected
+        position_size = np.minimum(position_size, CONFIG['MAX_POSITION'])
+        
         return position_size
     
     def backtest(self, df: pd.DataFrame, signal: pd.Series) -> Dict:
@@ -207,12 +223,16 @@ class TradingStrategy:
             # 1) Horizon-based exit
             if current_position != 0 and entry_idx is not None and (i - entry_idx) >= exit_horizon:
                 exit_price = df['Close'].iloc[i]
-                entry_price = trades[-1]['entry_price']
-                pnl = current_position * trades[-1]['size'] * (exit_price - entry_price) / entry_price
+                entry_price = trades[-1]['adjusted_entry_price'] if 'adjusted_entry_price' in trades[-1] else trades[-1]['entry_price']
+                # Apply slippage to the exit price based on direction
+                slippage_adjustment = CONFIG['SLIPPAGE'] * exit_price * (-current_position) # Negative for buys, positive for sells
+                adjusted_exit_price = exit_price + slippage_adjustment
+                pnl = current_position * trades[-1]['size'] * (adjusted_exit_price - entry_price) / entry_price
                 trades[-1].update({
                     'exit_time': df.index[i],
                     'exit_price': exit_price,
-                    'pnl': pnl - CONFIG['SLIPPAGE']
+                    'adjusted_exit_price': adjusted_exit_price,
+                    'pnl': pnl
                 })
                 current_position = 0
                 entry_idx = None
@@ -222,19 +242,28 @@ class TradingStrategy:
                 # Close existing position if any (and not already closed by horizon)
                 if current_position != 0 and entry_idx is not None:
                     exit_price = df['Close'].iloc[i]
-                    entry_price = trades[-1]['entry_price']
-                    pnl = current_position * trades[-1]['size'] * (exit_price - entry_price) / entry_price
+                    entry_price = trades[-1]['adjusted_entry_price'] if 'adjusted_entry_price' in trades[-1] else trades[-1]['entry_price']
+                    # Apply slippage to the exit price based on direction
+                    slippage_adjustment = CONFIG['SLIPPAGE'] * exit_price * (-current_position) # Negative for buys, positive for sells
+                    adjusted_exit_price = exit_price + slippage_adjustment
+                    pnl = current_position * trades[-1]['size'] * (adjusted_exit_price - entry_price) / entry_price
                     trades[-1].update({
                         'exit_time': df.index[i],
                         'exit_price': exit_price,
-                        'pnl': pnl - CONFIG['SLIPPAGE']
+                        'adjusted_exit_price': adjusted_exit_price,
+                        'pnl': pnl
                     })
                 
                 # Open new position if signal is not flat
                 if signal.iloc[i] != 0:
+                    entry_price = df['Close'].iloc[i]
+                    # Apply slippage to the entry price based on direction
+                    slippage_adjustment = CONFIG['SLIPPAGE'] * entry_price * signal.iloc[i]  # Positive for buys, negative for sells
+                    adjusted_entry_price = entry_price + slippage_adjustment
                     trades.append({
                         'entry_time': df.index[i],
-                        'entry_price': df['Close'].iloc[i],
+                        'entry_price': entry_price, # Store original price for reference
+                        'adjusted_entry_price': adjusted_entry_price, # Store slippage-adjusted price for PnL calc
                         'direction': signal.iloc[i],
                         'size': position_size.iloc[i],
                         'pnl': 0.0  # will be set on exit
@@ -261,7 +290,7 @@ class TradingStrategy:
         returns = pd.Series([t['pnl'] for t in trades], index=[t['entry_time'] for t in trades])
         annualized_return = returns.mean() * 252 * 6.5 * 60
         volatility        = returns.std()  * np.sqrt(252 * 6.5 * 60)
-        sharpe_ratio      = annualized_return / volatility if volatility != 0 else 0
+        sharpe_ratio      = annualized_return - 4.02 / (volatility*100) if volatility != 0 else 0
         cum_returns       = (1 + returns).cumprod()
         rolling_max       = cum_returns.expanding().max()
         max_drawdown      = ((cum_returns - rolling_max) / rolling_max).min()
@@ -299,7 +328,7 @@ class TradingStrategy:
         # Define parameter ranges
         long_threshold = trial.suggest_float('LONG_THRESHOLD', 0.6, 0.9)
         short_threshold = trial.suggest_float('SHORT_THRESHOLD', 0.1, 0.4)
-        target_vol = trial.suggest_float('TARGET_ANNUAL_VOL', 0.001, 0.02)
+        target_vol = trial.suggest_float('TARGET_ANNUAL_VOL', 0.01, 0.2)
         exit_horizon = trial.suggest_int('EXIT_HORIZON', 1, 15) * 60  # Convert to minutes
         epsilon = trial.suggest_float('EPSILON', 0.0001, 0.005)
         

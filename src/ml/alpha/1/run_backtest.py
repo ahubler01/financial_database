@@ -91,39 +91,45 @@ def generate_performance_report(metrics: Dict[str, Any], initial_capital: float,
     return "\n".join(report)
 
 def plot_performance(trades_df: pd.DataFrame, output_dir: Path):
-    # Set style
-    plt.style.use('seaborn-v0_8')
+    # Set style with dark background
+    plt.style.use('dark_background')
     
     # Create figure with subplots
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15), facecolor='black')
+    
+    # Define the orange color
+    ORANGE_COLOR = '#fb861b'
     
     # Plot cumulative returns
     trades_df['cumulative_return'] = (1 + trades_df['pnl']).cumprod()
-    ax1.plot(trades_df['entry_time'], trades_df['cumulative_return'])
-    ax1.set_title('Cumulative Returns')
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('Cumulative Return')
-    ax1.grid(True)
+    ax1.plot(trades_df['entry_time'], trades_df['cumulative_return'], color=ORANGE_COLOR, linewidth=1.5)
+    ax1.set_title('Cumulative Returns', color='white')
+    ax1.set_xlabel('Date', color='white')
+    ax1.set_ylabel('Cumulative Return', color='white')
+    ax1.grid(True, alpha=0.3)
+    ax1.set_facecolor('black')
     
     # Plot drawdown
     rolling_max = trades_df['cumulative_return'].expanding().max()
     drawdown = (trades_df['cumulative_return'] - rolling_max) / rolling_max
-    ax2.plot(trades_df['entry_time'], drawdown)
-    ax2.set_title('Drawdown')
-    ax2.set_xlabel('Date')
-    ax2.set_ylabel('Drawdown')
-    ax2.grid(True)
+    ax2.plot(trades_df['entry_time'], drawdown, color=ORANGE_COLOR, linewidth=1.5)
+    ax2.set_title('Drawdown', color='white')
+    ax2.set_xlabel('Date', color='white')
+    ax2.set_ylabel('Drawdown', color='white')
+    ax2.grid(True, alpha=0.3)
+    ax2.set_facecolor('black')
     
     # Plot trade PnL distribution
-    sns.histplot(trades_df['pnl'], bins=50, ax=ax3)
-    ax3.set_title('Trade PnL Distribution')
-    ax3.set_xlabel('PnL')
-    ax3.set_ylabel('Frequency')
-    ax3.grid(True)
+    sns.histplot(trades_df['pnl'], bins=50, ax=ax3, color=ORANGE_COLOR)
+    ax3.set_title('Trade PnL Distribution', color='white')
+    ax3.set_xlabel('PnL', color='white')
+    ax3.set_ylabel('Frequency', color='white')
+    ax3.grid(True, alpha=0.3)
+    ax3.set_facecolor('black')
     
     # Adjust layout and save
     plt.tight_layout()
-    plt.savefig(output_dir / 'performance_plots.png')
+    plt.savefig(output_dir / 'performance_plots.png', facecolor='black', edgecolor='none')
     plt.close()
 
 def main():
@@ -163,7 +169,7 @@ def main():
     strategy = TradingStrategy()
     strategy.train(X_train, y_train, X_val, y_val)
     
-    # # Perform hyperparameter tuning on validation set
+    # # # Perform hyperparameter tuning on validation set
     # logger.info("\nStarting hyperparameter tuning...")
     # best_params = strategy.tune_hyperparameters(X_val, y_val, val_data)
     # logger.info(f"\nBest parameters found: {best_params}")

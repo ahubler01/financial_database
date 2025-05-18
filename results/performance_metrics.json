@@ -1,12 +1,12 @@
 {
-    "annualized_return": -9.821954754087885,
-    "volatility": 0.0004918475064780329,
-    "sharpe_ratio": -19969.512144973247,
-    "max_drawdown": -0.3373228902377229,
-    "hit_rate": 0.0,
-    "avg_pnl_per_trade": -9.99384895613338e-05,
-    "turnover": 0.00010613653340618527,
-    "cumulative_return": -0.3373890550913484,
+    "annualized_return": 10.698609617316698,
+    "volatility": 0.16993750164392465,
+    "sharpe_ratio": 10.462052061679378,
+    "max_drawdown": -0.008895727245050642,
+    "hit_rate": 0.5432098765432098,
+    "avg_pnl_per_trade": 0.00010885846171465912,
+    "turnover": NaN,
+    "cumulative_return": 0.13106980962425752,
     "initial_capital": 1000000.0,
-    "final_portfolio_value": 662610.9449086515
+    "final_portfolio_value": 1131069.8096242575
 }

@@ -15,7 +15,7 @@
             "name": "Run Backtest",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/ml/alpha/run_backtest.py",
+            "program": "src/ml/alpha/1/run_backtest.py",
             "args": [
                 "--train", "2018-01-01,2019-06-01",
                 "--val", "2019-06-01,2019-12-31",
@@ -24,6 +24,22 @@
                 "--output-dir", "results",
                 "--initial-capital", "1000000",
                 "--target-freq", "1H"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Run Backtest 3",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "src/ml/alpha/3/run_backtest.py",
+            "args": [
+                "--data", "/Users/armandhubler/Documents/coding_project/financial_database/data/T2_engineered_features.csv",
+                "--output-dir", "results/autoencoder_strategy",
+                "--initial-capital", "1000000",
+                "--anomaly-percentile", "95",
+                "--risk-per-trade", "0.01",
+                "--stop-loss-pct", "0.002"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"

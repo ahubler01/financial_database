@@ -15,18 +15,18 @@ impacted the strategy's performance. Consider adjusting the following parameters
 3. Risk management rules
 
 Model Performance (Validation Set):
-Mean Squared Error (MSE): 0.074298
-Root Mean Squared Error (RMSE): 0.272577
+Mean Squared Error (MSE): 0.002195
+Root Mean Squared Error (RMSE): 0.046856
 
 Key Performance Indicators:
-1. Number of Trades: 4118
-2. Annualized Return: -982.20%
-3. Annualized Volatility: 0.05%
-4. Sharpe Ratio: -19969.51
-5. Maximum Drawdown: -33.73%
-6. Hit Rate: 0.00%
-7. Average PnL per Trade: $-99.94
-8. Annual Turnover: 0.00
+1. Number of Trades: 1134
+2. Annualized Return: 1069.86%
+3. Annualized Volatility: 16.99%
+4. Sharpe Ratio: 10.46
+5. Maximum Drawdown: -0.89%
+6. Hit Rate: 54.32%
+7. Average PnL per Trade: $108.86
+8. Annual Turnover: nan
 
 Strategy Overview:
 The strategy uses a LightGBM classifier to predict the direction of next-minute returns.
@@ -39,8 +39,8 @@ Position sizing is volatility-scaled to target 1% annual volatility.
 The strategy includes 0.5bp slippage per round-trip trade.
 
 Initial Capital: $1,000,000.00
-Final Portfolio Value: $662,610.94
-Total Return: -33.74%
+Final Portfolio Value: $1,131,069.81
+Total Return: 13.11%
 
 Risk Management:
 - Position sizing dynamically adjusts based on realized volatility
