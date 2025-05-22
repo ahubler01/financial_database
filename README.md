@@ -1,356 +1,212 @@
-# financial_database
+# Financial Database Project
 
-Big Data Group Project
+A high-frequency trading strategy implementation using machine learning to predict price movements in minute-by-minute data.
 
-# Data
+## Table of Contents
 
-### Period
+- [Overview](#overview)
+- [Data Sources](#data-sources)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Strategy Details](#strategy-details)
+- [Configuration](#configuration)
+- [Output](#output)
+- [Documentation](#documentation)
 
-01/01/2018 - 12/12/2020
+## Overview
 
-### Stock price
+This project implements a machine learning-based trading strategy for AAPL using minute-bar data. The strategy:
 
-One-minute granularity, ET time
+- Uses LightGBM for probabilistic predictions
+- Incorporates technical, market, macro, and sentiment features
+- Employs dynamic position sizing based on volatility and prediction confidence
+- Includes comprehensive risk management rules
 
-Tickers:
+## Data Sources
 
-- vix, https://www.cboe.com/tradable_products/vix/vix_historical_data/
+### Period Coverage: 2018-01-01 to 2020-12-31
 
-Spy: Issue Accessing Oneminutedata.com
+1. **AAPL 1-Minute Data**
 
-### Macroeconomics indicators
+   - Source: [Kaggle AAPL Dataset](https://www.kaggle.com/datasets/deltatrup/aapl-1-minute-historical-stock-data-2006-2024)
+   - Granularity: 1-minute bars
+   - Fields: Open, High, Low, Close, Volume, Adj Close
+   - Timezone: ET (Eastern Time)
 
-- composite_business_confidence_2018_2020\_\_monthly_fed, updated on 10th of the month at 11:27 AM CDT
-- net_exports_2018_2020\_\_quarterly_fed, updated on 27th of the month at 8:03AM CDT
-- insured_unemployment_2018_2020\_\_weekly_fed, updated on the 24th of the month at 7:48 AM CDT
-- sticky_cpi_2018_2020\_\_monthly_fed, updated on the 10 of the month at 12:01 PM CDT
-- m2_2018_2020\_\_weekly_fed, updated on the 22 of the month at 12:00 PM CDT
-- m1_2018_2020\_\_weekly_fed, updated on the 22 of the month at 12:00 PM CDT
-- effective_rates_2018_2020_monthly_fed, update on the 1st of the month at 3:17PM CDT
+2. **VIX Index**
 
-'CORESTICKM159SFRBATL': sticky_cpi_2018_2020
-'NETEXP': net_exports_2018_2020
-'FEDFUNDS': effective_rates_2018_2020_monthly_fed
-'WM1NS': m1_2018_2020
-'WM2NS': m2_2018_2020
-'BSCICP03USM665S': composite_business_confidence_2018_2020
-'CCSA': insured_unemployment_2018_2020
+   - Source: [CBOE VIX Historical Data](https://www.cboe.com/tradable_products/vix/vix_historical_data/)
+   - Granularity: Daily
+   - Fields: Open, High, Low, Close
 
-Would need a conversion from CDT to ET
+3. **Macroeconomic Indicators** (Federal Reserve)
+   | Indicator | Series ID | Frequency | Update Time (CDT) |
+   |-----------|-----------|-----------|-------------------|
+   | Business Confidence | BSCICP03USM665S | Monthly | 10th, 11:27 AM |
+   | Net Exports | NETEXP | Quarterly | 27th, 8:03 AM |
+   | Insured Unemployment | CCSA | Weekly | 24th, 7:48 AM |
+   | Sticky CPI | CORESTICKM159SFRBATL | Monthly | 10th, 12:01 PM |
+   | M1 Money Supply | WM1NS | Weekly | 22nd, 12:00 PM |
+   | M2 Money Supply | WM2NS | Weekly | 22nd, 12:00 PM |
+   | Fed Funds Rate | FEDFUNDS | Monthly | 1st, 3:17 PM |
 
-### Sentiment data (Reddit)
+4. **Sentiment Data**
+   - Source: [Reddit Stock Posts Dataset](https://www.kaggle.com/datasets/injek0626/reddit-stock-related-posts)
+   - Coverage: AAPL, GME, MCD, MSFT, NFLX, NVDA, TSLA
+   - Files: posts.csv, stock_index.csv, subreddit_subscribers.csv
 
-https://www.kaggle.com/datasets/injek0626/reddit-stock-related-posts?select=posts.csv
+## Requirements
 
-- posts.csv (AAPL, GME, MCD, MSFT, NFLX, NVDA, and TSLA from 2018 to 2022)
-- stock_index.csv (maps post with stock symbol and utc time)
-- subreddit_subscribers.csv (31st July 2023)
+- Python 3.8+
+- pandas
+- numpy
+- lightgbm
+- scikit-learn
+- matplotlib
+- seaborn
+- optuna
 
-# Data Transformation Pipeline
+## Installation
 
-The data transformation pipeline (`src/data/T1.py`) performs the following operations:
-
-1. **Data Loading and Merging**
-
-   - Loads stock data (AAPL and VIX) and merges them
-   - Loads all macro-economic indicators and merges them
-   - Loads Reddit data and filters for the period 2018-2020
-   - Aggregates Reddit posts to daily frequency using sum aggregation for post counts and mean aggregation for sentiment scores
-   - Merges all data sources on timestamp using `merge_asof` with backward direction to preserve all time points
-   - Handles timezone differences by converting all timestamps to ET (Eastern Time)
-   - Applies forward-fill (ffill) after merging to handle any remaining gaps
-
-2. **Data Cleaning**
-
-   - Removes rows with all NaN values
-   - Applies forward-fill (ffill) to stock and macro data to handle missing values
-   - Removes any remaining NaN values after processing
-
-3. **Data Normalization**
-
-   - Applies winsorization to all numeric columns (5% on both tails) to handle outliers
-   - Applies min-max normalization to all numeric columns to scale values between 0 and 1
-
-4. **Output**
-   - Saves the processed data to `data/processed_data_2018_2020.csv`
-   - Logs information about the processing steps and final data shape
-
-The pipeline ensures that all data is properly aligned in time and normalized for further analysis.
-
-## Quant ML Trading Strategy
-
-### Overview
-
-This repository implements a machine learning-based trading strategy for AAPL using minute-bar data. The strategy uses engineered features to predict the direction of next-minute returns and generates trading signals based on the model's predictions.
-
-**Dependent Variable**: Sign of next-minute returns (with 1bp threshold)
-**Algorithm**: LightGBM classifier with hyperparameter tuning
-**Feature Universe**: Engineered features from minute-bar data (see `T2_engineered_features.csv`)
-
-### Label Definition
-
-The strategy predicts the sign of next-minute returns:
-
-- yₜ = sign(log_returnₜ₊₁) with threshold ε=0.0001 (1bp)
-- Returns below the threshold are considered flat (0)
-
-### Model
-
-The strategy uses a LightGBM classifier with the following characteristics:
-
-- Binary classification objective
-- Hyperparameter tuning via grid search on validation set
-- Early stopping to prevent overfitting
-- Feature importance analysis available
-
-### Trading Rules
-
-**Entry Conditions**:
-
-- Long position: p̂(y=+1) > 0.55
-- Short position: p̂(y=+1) < 0.45
-- Flat position: otherwise
-
-**Exit Conditions**:
-
-- Exit at t+1 or when signal flips, whichever comes first
-- Slippage assumption: 0.5bp per round-trip
-
-### Position Sizing
-
-- Target annual volatility: 1%
-- Position size: 1% / realized_vol_3blockₜ (scaled to p.a.)
-- Volatility scaling based on 3-block realized volatility
-
-### Backtest Results
-
-| Metric            | Value |
-| ----------------- | ----- |
-| Annualized Return | TBD   |
-| Volatility        | TBD   |
-| Sharpe Ratio      | TBD   |
-| Max Drawdown      | TBD   |
-| Hit Rate          | TBD   |
-| Avg PnL per Trade | TBD   |
-| Turnover          | TBD   |
-
-### How to Run
-
-1. Ensure you have the required dependencies installed:
+1. Clone the repository:
 
    ```bash
-   pip install pandas numpy lightgbm scikit-learn
+   git clone https://github.com/yourusername/financial_database.git
+   cd financial_database
    ```
 
-2. Run the backtest with specified date ranges:
+2. Create and activate a virtual environment:
 
    ```bash
-   python alpha/run_backtest.py \
-     --train "2020-01-01,2020-12-31" \
-     --val "2021-01-01,2021-12-31" \
-     --test "2022-01-01,2022-12-31" \
-     --data T2_engineered_features.csv \
-     --output-dir results
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Results will be saved in the specified output directory:
-   - `trained_model.pkl`: Serialized LightGBM model
-   - `trade_pnl.csv`: Trade-by-trade PnL data
-   - `performance_metrics.json`: Summary performance metrics
-
-# High-Frequency Trading Strategy
-
-This repository implements a high-frequency trading strategy using machine learning to predict price movements in minute-by-minute data.
-
-## Strategy Overview
-
-The strategy uses a LightGBM classifier to predict the direction of next-minute returns. Key components include:
-
-1. **Feature Engineering**: Technical indicators and price-based features are calculated from minute-by-minute data
-2. **Model Training**: A LightGBM classifier is trained to predict the probability of positive returns
-3. **Signal Generation**: Trading signals are generated based on probability thresholds
-4. **Position Sizing**: Positions are sized based on volatility targeting
-5. **Risk Management**: Multiple exit conditions and position limits are implemented
-
-## Configuration Parameters
-
-### Model Parameters
-
-```python
-'MODEL_PARAMS': {
-    'objective': 'binary',        # Binary classification task
-    'metric': 'binary_logloss',   # Evaluation metric
-    'boosting_type': 'gbdt',      # Gradient Boosting Decision Tree
-    'num_leaves': 31,            # Number of leaves in each tree
-    'learning_rate': 0.05,       # Learning rate for gradient boosting
-    'feature_fraction': 0.9,     # Fraction of features to use in each iteration
-    'bagging_fraction': 0.8,     # Fraction of data to use in each iteration
-    'bagging_freq': 5,           # Frequency of bagging
-    'verbose': -1                # Suppress LightGBM output
-}
-```
-
-### Trading Parameters
-
-```python
-'EPSILON': 0.0001,              # 1bp threshold for label definition
-'LONG_THRESHOLD': 0.25,         # Probability threshold for long positions
-'SHORT_THRESHOLD': 0.75,        # Probability threshold for short positions
-'TARGET_ANNUAL_VOL': 0.001,     # 1% target annual volatility
-'SLIPPAGE': 0.0001,             # 1bp slippage per round-trip trade
-'EXIT_HORIZON': 60*5,           # 5-minute maximum holding period
-'MAX_POSITION': 15.0,           # Maximum position size
-'SIGNAL_FREQUENCY': '1D',       # Frequency for signal aggregation
-'PROB_AGG_METHOD': 'mean'       # Method for probability aggregation
-```
-
-## Signal Generation Process
-
-1. **Minute-by-Minute Prediction**:
-
-   - The model generates probability predictions for each minute
-   - These probabilities represent the likelihood of a positive return in the next minute
-
-2. **Probability Aggregation**:
-
-   - Probabilities are aggregated to the specified frequency (default: daily)
-   - Available aggregation methods:
-     - `mean`: Average probability over the period
-     - `median`: Middle probability over the period
-     - `max`: Most bullish probability in the period
-     - `min`: Most bearish probability in the period
-
-3. **Signal Creation**:
-   - Long positions when aggregated probability > 0.25
-   - Short positions when aggregated probability < 0.75
-   - Flat position otherwise
-
-## Position Sizing and Risk Management
-
-1. **Volatility Targeting**:
-
-   - Position sizes are scaled to target 1% annual volatility
-   - Formula: `position_size = min(TARGET_ANNUAL_VOL/annualized_vol, MAX_POSITION)`
-   - Annualized volatility is calculated from 3-block realized volatility
-
-2. **Exit Conditions**:
-
-   - Time-based exit: Positions are automatically closed after 5 minutes
-   - Signal-based exit: Positions are closed when the signal flips direction
-   - Whichever condition occurs first triggers the exit
-
-3. **Risk Controls**:
-   - Maximum position size cap (15.0 units)
-   - Slippage costs included in PnL calculations
-   - Dynamic position sizing based on realized volatility
-
-## Performance Metrics
-
-The strategy tracks several key performance indicators:
-
-1. Number of Trades
-2. Annualized Return
-3. Annualized Volatility
-4. Sharpe Ratio
-5. Maximum Drawdown
-6. Hit Rate (percentage of profitable trades)
-7. Average PnL per Trade
-8. Annual Turnover
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ## Usage
 
-1. **Data Preparation**:
+1. **Data Processing Pipeline**:
 
-   - Ensure data is in the correct format with required features
-   - Split data into training, validation, and test periods
+   ```bash
+   # Run T1 (Data Integration)
+   python src/data_processing/T1.py
 
-2. **Model Training**:
+   # Run T2 (Feature Engineering)
+   python src/data_processing/T2_feature_engineering.py \
+       --train-period "2018-01-01,2019-06-01" \
+       --val-period "2019-06-01,2019-12-31" \
+       --test-period "2020-01-01,2020-12-31" \
+       --freq "1min" \
+       --output-dir "data"
+   ```
 
-   - Train the model using the training and validation sets
-   - Adjust model parameters as needed
+2. **Run Trading Strategy**:
+   ```bash
+   python src/ml/alpha/run_backtest.py \
+       --train "2018-01-01,2019-06-01" \
+       --val "2019-06-01,2019-12-31" \
+       --test "2020-01-01,2020-12-31" \
+       --data "T2_engineered_features.csv" \
+       --output-dir "results" \
+       --initial-capital 1000000 \
+       --target-freq "1H"
+   ```
 
-3. **Backtesting**:
+## Strategy Details
 
-   - Run backtest with specified parameters
-   - Analyze performance metrics and adjust strategy parameters
+### Model
 
-4. **Parameter Optimization**:
-   - Experiment with different signal frequencies
-   - Try different probability aggregation methods
-   - Adjust position sizing and risk parameters
+- **Algorithm**: LightGBM classifier
+- **Target Variable**: Sign of next-minute returns (with 5bp threshold)
+- **Features**: Technical, market, macro, and sentiment indicators
 
-## Example Configuration
+### Trading Rules
+
+- **Entry**:
+
+  - Long: p̂(y=+1) > 0.62
+  - Short: p̂(y=+1) < 0.38
+  - Neutral: 0.38 ≤ p̂(y=+1) ≤ 0.62
+
+- **Position Sizing**:
+
+  - Base size: TARGET_ANNUAL_VOL / realized_vol
+  - Confidence multiplier: |prob - 0.5| \* 2
+  - Maximum position: 20.0 units
+
+- **Exit Conditions**:
+  - Time-based: t+10 minutes
+  - Signal-based: When prediction crosses neutral zone
+  - Whichever comes first
+
+## Configuration
+
+Key parameters can be modified in `src/ml/alpha/1/strategy.py`:
 
 ```python
-# Daily signals using mean probability
 CONFIG = {
-    'SIGNAL_FREQUENCY': '1D',
-    'PROB_AGG_METHOD': 'mean',
-    'LONG_THRESHOLD': 0.25,
-    'SHORT_THRESHOLD': 0.75,
-    'TARGET_ANNUAL_VOL': 0.001,
-    'EXIT_HORIZON': 60*5
+    'EPSILON': 0.0005,           # 5bp threshold
+    'LONG_THRESHOLD': 0.62,      # Long entry threshold
+    'SHORT_THRESHOLD': 0.38,     # Short entry threshold
+    'TARGET_ANNUAL_VOL': 0.45,   # Target volatility
+    'SLIPPAGE': 0.0001,         # 1bp per round-trip
+    'EXIT_HORIZON': 60*10,      # 10-minute max hold
+    'MAX_POSITION': 20.0,       # Position cap
+    'POSITION_MULTIPLIER': 15.5  # Size multiplier
 }
 ```
 
-## Notes
+## Output
 
-- The strategy is designed for high-frequency trading with quick entry and exit
-- Asymmetric thresholds suggest different risk tolerances for long vs short positions
-- Performance may vary significantly in different market conditions
-- Consider adjusting parameters based on market regime and volatility environment
+Results are saved in the specified output directory:
 
-## Model Enhancements
+- `trained_model.pkl`: Serialized model
+- `trade_pnl.csv`: Trade-by-trade results
+- `performance_metrics.json`: Strategy metrics
+- `performance_plots.png`: Visual analysis
+- `performance_report.txt`: Detailed report
 
-### Threshold Optimization
+## Documentation
 
-The strategy now includes an automated threshold optimization process that:
+- [Data Pipeline Documentation](DATA_PIPELINE.md)
+- [Strategy Documentation](src/ml/alpha/1/strategy.py)
+- [Feature Engineering Details](src/data_processing/T2_feature_engineering.py)
 
-- Performs a grid search over short (0.1-0.4) and long (0.6-0.9) thresholds
-- Evaluates each threshold pair on the validation set using Sharpe ratio
-- Automatically updates the configuration with optimal thresholds
-- Results are stored in the strategy's `optimal_thresholds` attribute
+## Performance Results
 
-### Confidence-Based Position Sizing
+Latest backtest results for period 2020-01-01 to 2020-12-31:
 
-Position sizing now incorporates model confidence:
+### Trading Statistics
 
-- Base position size is calculated as: `TARGET_ANNUAL_VOL / annualized_vol`
-- Confidence score is computed as: `|prob_pos - 0.5| * 2` (maps [0.5-1] → [0-1])
-- Final position size is: `min(base_size * confidence, MAX_POSITION)`
-- This results in larger positions for high-confidence predictions and smaller positions for uncertain ones
+| Metric                | Value   |
+| --------------------- | ------- |
+| Number of Trades      | 1,134   |
+| Hit Rate              | 54.32%  |
+| Average PnL per Trade | $108.86 |
+| Annual Turnover       | -       |
 
-### Target Smoothing
+### Returns and Risk
 
-The target variable has been enhanced with:
+| Metric                | Value         |
+| --------------------- | ------------- |
+| Initial Capital       | $1,000,000.00 |
+| Final Portfolio Value | $1,131,069.81 |
+| Total Return          | 13.11%        |
+| Annualized Return     | 1069.86%      |
+| Annualized Volatility | 16.99%        |
+| Sharpe Ratio          | 10.46         |
+| Maximum Drawdown      | -0.89%        |
 
-- 3-period rolling mean smoothing of returns
-- Increased epsilon threshold to 5 basis points (from 1bp)
-- Benefits:
-  - Reduces noise in the target variable
-  - Captures more meaningful price movements
-  - Improves model stability
-  - Better aligns with actual trading conditions
+### Model Performance (Validation Set)
 
-### Usage
+| Metric                         | Value    |
+| ------------------------------ | -------- |
+| Mean Squared Error (MSE)       | 0.002195 |
+| Root Mean Squared Error (RMSE) | 4.6856   |
 
-To run the enhanced strategy:
-
-```bash
-python src/ml/alpha/run_backtest.py \
-    --train 2018-01-01,2019-06-01 \
-    --val 2019-06-01,2019-12-31 \
-    --test 2020-01-01,2020-12-31 \
-    --data T2_engineered_features.csv \
-    --output-dir results \
-    --initial-capital 1000000 \
-    --target-freq 1H
-```
-
-The strategy will:
-
-1. Load and prepare the data with smoothed targets
-2. Train the model with optimized parameters
-3. Perform threshold optimization on the validation set
-4. Run the backtest with confidence-based position sizing
-5. Generate performance reports and plots
+Note: The test period (2020) was characterized by high market volatility (AAPL Annualized Vol: 39354.69%) and bearish conditions, which influenced strategy performance. Risk management parameters may need adjustment for different market regimes.
