@@ -16,7 +16,7 @@ impacted the strategy's performance. Consider adjusting the following parameters
 
 Model Performance (Validation Set):
 Mean Squared Error (MSE): 0.002195
-Root Mean Squared Error (RMSE): 0.046856
+Root Mean Squared Error (RMSE): 4.6856
 
 Key Performance Indicators:
 1. Number of Trades: 1134
@@ -31,8 +31,8 @@ Key Performance Indicators:
 Strategy Overview:
 The strategy uses a LightGBM classifier to predict the direction of next-minute returns.
 Trades are executed when the model's probability exceeds predefined thresholds:
-- Long positions when p̂(y=+1) > 0.55
-- Short positions when p̂(y=+1) < 0.45
+- Long positions when p̂(y=+1) > 0.62
+- Short positions when p̂(y=+1) < 0.38
 - Flat otherwise
 
 Position sizing is volatility-scaled to target 1% annual volatility.

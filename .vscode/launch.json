@@ -48,7 +48,7 @@
             "name": "Feature Engineering",
             "type": "debugpy",
             "request": "launch",
-            "program": "src/ml/feature_engineering/T2_feature_engineering.py",
+            "program": "src/data_processing/T2_feature_engineering.py",
             "args": [
                 "--train-period", "2018-01-01,2019-06-01",
                 "--val-period", "2019-06-01,2019-12-31",

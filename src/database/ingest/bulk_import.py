@@ -5,8 +5,8 @@ from tqdm import tqdm
 import numpy as np
 
 # Supabase configuration
-SUPABASE_URL = "https://wlwnbvqkmmnmlyhvygrv.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indsd25idnFrbW1ubWx5aHZ5Z3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MDk1MzYsImV4cCI6MjA2MDI4NTUzNn0.BPlGrxvMpMnP3PcAUtlf8W1PncqFOCjD_1AFZENyHj8"
+SUPABASE_URL = ""
+SUPABASE_KEY = ""
 
 # Initialize Supabase client
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)

@@ -14,12 +14,6 @@ One-minute granularity, ET time
 
 Tickers:
 
-- aapl
-- amzn
-- tsla
-- nvda
-- msft
-- spx
 - vix, https://www.cboe.com/tradable_products/vix/vix_historical_data/
 
 Spy: Issue Accessing Oneminutedata.com
