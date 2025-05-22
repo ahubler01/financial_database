@@ -209,4 +209,4 @@ Latest backtest results for period 2020-01-01 to 2020-12-31:
 | Mean Squared Error (MSE)       | 0.002195 |
 | Root Mean Squared Error (RMSE) | 4.6856   |
 
-Note: The test period (2020) was characterized by high market volatility (AAPL Annualized Vol: 39354.69%) and bearish conditions, which influenced strategy performance. Risk management parameters may need adjustment for different market regimes.
+Note: The test period (2020) was characterized by high market volatility and bearish conditions, which influenced strategy performance. Risk management parameters may need adjustment for different market regimes.
