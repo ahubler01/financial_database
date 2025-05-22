@@ -204,9 +204,8 @@ Latest backtest results for period 2020-01-01 to 2020-12-31:
 
 ### Model Performance (Validation Set)
 
-| Metric                         | Value    |
-| ------------------------------ | -------- |
-| Mean Squared Error (MSE)       | 0.002195 |
-| Root Mean Squared Error (RMSE) | 4.6856   |
+| Metric                         | Value  |
+| ------------------------------ | ------ |
+| Root Mean Squared Error (RMSE) | 4.6856 |
 
 Note: The test period (2020) was characterized by high market volatility and bearish conditions, which influenced strategy performance. Risk management parameters may need adjustment for different market regimes.
